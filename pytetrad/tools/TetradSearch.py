@@ -6,13 +6,15 @@
 
 import jpype
 import jpype.imports
+import os
 
+tetrad_lib_path = os.path.join(os.path.dirname(__file__), '../resources/tetrad-current.jar')
 try:
-    jpype.startJVM(jpype.getDefaultJVMPath(), "-Xmx40g", classpath=[f"resources/tetrad-current.jar"])
+    jpype.startJVM(jpype.getDefaultJVMPath(), "-Xmx40g", classpath=[tetrad_lib_path])
 except OSError:
     pass
 
-import tools.translate as tr
+import pytetrad.tools.translate as tr
 import edu.cmu.tetrad.search as ts
 import edu.cmu.tetrad.data as td
 import edu.cmu.tetrad.graph.GraphSaveLoadUtils as gp
@@ -44,6 +46,17 @@ class TetradSearch:
     def __str__(self):
         display = [self.score, self.test, self.knowledge, self.java]
         return "\n\n".join([str(item) for item in display])
+
+    @staticmethod
+    def start_vm():
+        try:
+            jpype.startJVM(jpype.getDefaultJVMPath(), "-Xmx40g", classpath=[tetrad_lib_path])
+        except OSError:
+            print("JVM already started")
+
+    @staticmethod
+    def stop_vm():
+        jpype.shutdownJVM()
 
     def use_sem_bic(self, penalty_discount=2, structurePrior=0, sem_bic_rule=1):
         self.params.set(Params.PENALTY_DISCOUNT, penalty_discount)
@@ -139,10 +152,10 @@ class TetradSearch:
         self.knowledge.setTierForbiddenWithin(lang.Integer(tier), forbiddenWithin)
 
     def add_fobidden(self, var_name_1, var_name_2):
-        self.knowledge.addForbidden(lang.String(var_name_1), lang.String(var_name_2))
+        self.knowledge.setForbidden(lang.String(var_name_1), lang.String(var_name_2))
 
     def add_required(self, var_name_1, var_name_2):
-        self.knowledge.addRequired(lang.String(var_name_1), lang.String(var_name_2))
+        self.knowledge.setRequired(lang.String(var_name_1), lang.String(var_name_2))
 
     def set_knowledge(self, knowledge):
         self.knowledge = knowledge
@@ -159,6 +172,23 @@ class TetradSearch:
         X = [str(x) for x in self.knowledge.getVariables()]
         Y = [str(y) for y in self.data.getVariableNames()]
         return [x for x in X if x not in Y]
+
+    def add_knowledge(self, forbiddirect = None, requiredirect = None):
+        # forbidden directed edges
+        if forbiddirect is not None:
+            for i in range(0, len(forbiddirect)):
+                forbid = forbiddirect[i]
+                _from = forbid[0]
+                _to = forbid[1]
+                self.add_fobidden(_from, _to)
+
+        # required directed edges
+        if requiredirect is not None:
+            for i in range(0, len(requiredirect)):
+                require = requiredirect[i]
+                _from = require[0]
+                _to = require[1]
+                self.add_required(_from, _to)
 
     def print_knowledge(self):
         print(self.knowledge)
